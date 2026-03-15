@@ -1,3 +1,14 @@
+/** Build apiKeys object for request body - only include non-empty keys */
+async function getApiKeysForRequest() {
+  const { apiKeys } = await chrome.storage.local.get("apiKeys");
+  if (!apiKeys || typeof apiKeys !== "object") return undefined;
+  const out = {};
+  if (typeof apiKeys.anthropic === "string" && apiKeys.anthropic.trim()) out.anthropic = apiKeys.anthropic.trim();
+  if (typeof apiKeys.google === "string" && apiKeys.google.trim()) out.google = apiKeys.google.trim();
+  if (typeof apiKeys.groq === "string" && apiKeys.groq.trim()) out.groq = apiKeys.groq.trim();
+  return Object.keys(out).length ? out : undefined;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const connectNotionBtn = document.getElementById("connectNotionBtn");
   const connectNotion = document.getElementById("connectNotion");
@@ -9,10 +20,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   const statusEl = document.getElementById("status");
   const apiUrlInput = document.getElementById("apiUrl");
   const aiModelSelect = document.getElementById("aiModel");
+  const apiKeyClaude = document.getElementById("apiKeyClaude");
+  const apiKeyGemini = document.getElementById("apiKeyGemini");
+  const apiKeyGroq = document.getElementById("apiKeyGroq");
+  const saveApiKeysBtn = document.getElementById("saveApiKeys");
 
-  const { apiUrl, aiModel } = await chrome.storage.local.get(["apiUrl", "aiModel"]);
+  const { apiUrl, aiModel, apiKeys } = await chrome.storage.local.get(["apiUrl", "aiModel", "apiKeys"]);
   apiUrlInput.value = apiUrl || "http://localhost:3001";
   aiModelSelect.value = aiModel || "claude";
+  if (apiKeys) {
+    apiKeyClaude.value = apiKeys.anthropic || "";
+    apiKeyGemini.value = apiKeys.google || "";
+    apiKeyGroq.value = apiKeys.groq || "";
+  }
 
   apiUrlInput.addEventListener("change", async () => {
     await chrome.storage.local.set({ apiUrl: apiUrlInput.value });
@@ -22,6 +42,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   aiModelSelect.addEventListener("change", async () => {
     await chrome.storage.local.set({ aiModel: aiModelSelect.value });
     setStatus("Model saved", true);
+  });
+
+  saveApiKeysBtn.addEventListener("click", async () => {
+    const keys = {
+      anthropic: (apiKeyClaude.value || "").trim(),
+      google: (apiKeyGemini.value || "").trim(),
+      groq: (apiKeyGroq.value || "").trim(),
+    };
+    await chrome.storage.local.set({ apiKeys: keys });
+    setStatus("API keys saved", true);
   });
 
   async function getApiUrl() {
@@ -74,10 +104,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       setStatus("Saving...");
       const { aiModel } = await chrome.storage.local.get("aiModel");
+      const apiKeys = await getApiKeysForRequest();
       const res = await fetch(`${base}/api/tabs-to-notion`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tabs: tabData, model: aiModel || "claude" }),
+        body: JSON.stringify({ tabs: tabData, model: aiModel || "claude", apiKeys }),
       });
 
       const data = await res.json();
@@ -121,10 +152,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       setStatus("Creating summary...");
       const { aiModel } = await chrome.storage.local.get("aiModel");
+      const apiKeys = await getApiKeysForRequest();
       const res = await fetch(`${base}/api/research-summary`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tabs: tabData, model: aiModel || "claude" }),
+        body: JSON.stringify({ tabs: tabData, model: aiModel || "claude", apiKeys }),
       });
       const data = await res.json();
       if (res.ok) setStatus("✓ Summary saved to Notion", true);

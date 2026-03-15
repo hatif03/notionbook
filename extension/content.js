@@ -4,6 +4,16 @@
 
   const STORAGE_KEY = "pm-prototyper-mockups";
   let isToolbarVisible = false;
+
+  async function getApiKeysForRequest() {
+    const { apiKeys } = await chrome.storage.local.get("apiKeys");
+    if (!apiKeys || typeof apiKeys !== "object") return undefined;
+    const out = {};
+    if (typeof apiKeys.anthropic === "string" && apiKeys.anthropic.trim()) out.anthropic = apiKeys.anthropic.trim();
+    if (typeof apiKeys.google === "string" && apiKeys.google.trim()) out.google = apiKeys.google.trim();
+    if (typeof apiKeys.groq === "string" && apiKeys.groq.trim()) out.groq = apiKeys.groq.trim();
+    return Object.keys(out).length ? out : undefined;
+  }
   let selectedComponent = null;
   let components = [];
   let componentIdCounter = 0;
@@ -892,10 +902,11 @@
     statusEl.textContent = "⏳ Generating...";
 
     try {
+      const apiKeys = await getApiKeysForRequest();
       const response = await fetch(`${apiUrl}/api/generate-component`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, context: document.title }),
+        body: JSON.stringify({ prompt, context: document.title, apiKeys }),
       });
 
       if (!response.ok) throw new Error("Generation failed");
@@ -1060,6 +1071,7 @@
       const imageBase64 = canvas.toDataURL("image/png").split(",")[1];
       const { apiUrl: base } = await chrome.storage.local.get("apiUrl");
       const { aiModel } = await chrome.storage.local.get("aiModel");
+      const apiKeys = await getApiKeysForRequest();
       const res = await fetch((base || apiUrl || "http://localhost:3001") + "/api/screenshot-to-notion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1068,6 +1080,7 @@
           url: window.location.href,
           title: "Prototype: " + document.title,
           model: aiModel || "claude",
+          apiKeys,
         }),
       });
       const data = await res.json();
@@ -1151,6 +1164,7 @@
               width: window.innerWidth, height: window.innerHeight,
             });
             const imageBase64 = canvas.toDataURL("image/png").split(",")[1];
+            const apiKeys = await getApiKeysForRequest();
             const res = await fetch(`${baseUrl}/api/screenshot-to-notion`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -1159,6 +1173,7 @@
                 url: window.location.href,
                 title: document.title,
                 model: aiModel || "claude",
+                apiKeys,
               }),
             });
             const data = await res.json();
@@ -1211,10 +1226,11 @@
         try {
           const { apiUrl: base } = await chrome.storage.local.get("apiUrl");
           const { aiModel } = await chrome.storage.local.get("aiModel");
+          const apiKeys = await getApiKeysForRequest();
           await fetch((base || "http://localhost:3001") + "/api/quick-capture", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ quote: text, url: location.href, title: document.title, model: aiModel || "claude" }),
+            body: JSON.stringify({ quote: text, url: location.href, title: document.title, model: aiModel || "claude", apiKeys }),
           });
           quickCaptureEl.remove();
           quickCaptureEl = null;

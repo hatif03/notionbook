@@ -31,7 +31,7 @@
 
 - Node.js 18+
 - Chromium-based browser
-- At least one AI API key (Claude, Gemini, or Groq)
+- At least one AI API key (Claude, Gemini, or Groq) – entered in the extension (BYOK)
 
 ### 1. Clone & Install
 
@@ -44,14 +44,9 @@ npm install
 
 ### 2. Configure Environment
 
-Create `server/.env`:
+Create `server/.env` (optional – no AI keys needed; see BYOK below):
 
 ```env
-# At least one AI provider
-ANTHROPIC_API_KEY=your_key
-GOOGLE_AI_API_KEY=your_key
-GROQ_API_KEY=your_key
-
 PORT=3001
 ```
 
@@ -69,12 +64,13 @@ npm run dev
 3. Click **Load unpacked**
 4. Select the `extension` folder
 
-### 5. Connect to Notion
+### 5. Connect & Add API Keys (BYOK)
 
 1. Click the Notionbook icon
 2. Enter your API URL (e.g. `http://localhost:3001` or your forwarded URL)
-3. Click **Connect to Notion** – complete OAuth in the new tab
-4. Choose your AI model and start saving tabs
+3. Add your AI API keys (Claude, Gemini, or Groq) – keys stay in your browser, never on our servers
+4. Click **Save API Keys**, then **Connect to Notion** – complete OAuth in the new tab
+5. Choose your AI model and start saving tabs
 
 ## Notion AI Challenge Submission
 
@@ -110,13 +106,19 @@ notionbook/
 └── README.md
 ```
 
+## BYOK (Bring Your Own Key)
+
+Notionbook uses a BYOK model: **API keys are stored only in your browser** and sent per-request to the server. The server never persists or logs them.
+
+1. Open the extension popup → **API Keys (BYOK)** section
+2. Enter your Claude, Gemini, or Groq key (at least one)
+3. Click **Save API Keys**
+4. Keys are stored in `chrome.storage.local` and included in AI requests
+
 ## Environment Variables
 
 | Variable | Purpose |
 |---------|---------|
-| `ANTHROPIC_API_KEY` | Claude |
-| `GOOGLE_AI_API_KEY` | Gemini |
-| `GROQ_API_KEY` | Groq |
 | `NOTION_OAUTH_CLIENT_ID` | Optional – uses dynamic registration if not set |
 | `NOTION_OAUTH_CLIENT_SECRET` | Optional |
 | `PORT` | Server port (default: 3001) |
@@ -125,7 +127,7 @@ notionbook/
 
 - **Not connected to Notion** – Click Connect to Notion and complete OAuth
 - **CORS / API URL** – Use forwarded HTTPS URL when not on localhost
-- **AI errors** – Ensure at least one API key is set in `.env`
+- **AI errors** – Add your API key in the extension (Settings → API Keys) and ensure the selected model matches
 
 ## License
 

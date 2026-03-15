@@ -1,9 +1,20 @@
 import { Router, Request, Response } from "express";
 import { getValidAccessToken } from "../mcp/get-access-token.js";
 import { notionSearch, notionCreatePages } from "../mcp/notion-client.js";
-import { complete } from "../ai/provider.js";
+import { complete, type AIApiKeys } from "../ai/provider.js";
 
 const router = Router();
+
+/** Extract BYOK keys from request - never logged or persisted */
+function getApiKeys(req: Request): AIApiKeys | undefined {
+  const keys = req.body?.apiKeys;
+  if (!keys || typeof keys !== "object") return undefined;
+  return {
+    anthropic: typeof keys.anthropic === "string" ? keys.anthropic : undefined,
+    google: typeof keys.google === "string" ? keys.google : undefined,
+    groq: typeof keys.groq === "string" ? keys.groq : undefined,
+  };
+}
 
 router.post("/api/tabs-to-notion", async (req: Request, res: Response) => {
   try {
@@ -23,6 +34,7 @@ router.post("/api/tabs-to-notion", async (req: Request, res: Response) => {
 
     const { text } = await complete({
       model: model as "claude" | "gemini" | "groq",
+      apiKeys: getApiKeys(req),
       prompt: `For each of these browser tabs, generate a concise task title (3-8 words) and a one-line description. Return ONLY a JSON array with objects: [{ "title": "...", "description": "..." }, ...]. Same order as input.
 
 Tabs:
@@ -123,6 +135,7 @@ router.post("/api/screenshot-to-notion", async (req: Request, res: Response) => 
     if (title || url) {
       const { text } = await complete({
         model: model as "claude" | "gemini" | "groq",
+        apiKeys: getApiKeys(req),
         prompt: `Summarize this captured page in 1-2 sentences: ${title || ""} from ${url || "unknown"}`,
         maxTokens: 150,
       });
@@ -195,6 +208,7 @@ router.post("/api/research-summary", async (req: Request, res: Response) => {
 
     const { text } = await complete({
       model: model as "claude" | "gemini" | "groq",
+      apiKeys: getApiKeys(req),
       prompt: `Create a structured research summary from these tabs. Include: 1) Key themes, 2) Competitors/findings, 3) Key insights, 4) Suggested next steps. Use markdown headings and bullet points.
 
 Tabs:
@@ -253,6 +267,7 @@ router.post("/api/quick-capture", async (req: Request, res: Response) => {
 
     const { text } = await complete({
       model: model as "claude" | "gemini" | "groq",
+      apiKeys: getApiKeys(req),
       prompt: `Tag this quote with 1-3 comma-separated tags (e.g. "insight, competitor, pricing"): "${quote.slice(0, 200)}"`,
       maxTokens: 50,
     });
@@ -309,6 +324,7 @@ router.post("/api/tab-to-feature-request", async (req: Request, res: Response) =
 
     const { text } = await complete({
       model: model as "claude" | "gemini" | "groq",
+      apiKeys: getApiKeys(req),
       prompt: `Create a concise feature request title (5-10 words) from: ${title || url}`,
       maxTokens: 50,
     });

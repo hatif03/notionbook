@@ -20,24 +20,22 @@ app.use(express.json({ limit: "10mb" }));
 app.use(authRoutes);
 app.use(apiRoutes);
 
-// Check for API key
-const apiKey = process.env.ANTHROPIC_API_KEY || process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
-if (!apiKey) {
-  console.error("⚠️  WARNING: No ANTHROPIC_API_KEY found in .env file!");
-  console.error("   Create a .env file with: ANTHROPIC_API_KEY=your-key-here");
-}
-
-const anthropic = new Anthropic({
-  apiKey: apiKey,
-});
-
 app.post("/api/generate-component", async (req, res) => {
   try {
-    const { prompt, context } = req.body;
+    const { prompt, context, apiKeys } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ error: "Prompt is required" });
     }
+
+    const anthropicKey = apiKeys?.anthropic ?? process.env.ANTHROPIC_API_KEY;
+    if (!anthropicKey) {
+      return res.status(400).json({
+        error: "Claude API key required. Add your key in extension settings (BYOK).",
+      });
+    }
+
+    const anthropic = new Anthropic({ apiKey: anthropicKey });
 
     const systemPrompt = `You are a UI component generator for a visual prototyping tool. Generate HTML and inline CSS for UI components that can be overlaid on existing websites.
 
