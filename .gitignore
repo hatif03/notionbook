@@ -1,0 +1,28 @@
+# Environment variables
+.env
+.env.local
+
+# Notion OAuth tokens (sensitive)
+notion-tokens.json
+notion-oauth-client.json
+
+# Dependencies
+node_modules
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Build output
+dist
+build

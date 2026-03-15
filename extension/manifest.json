@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Notionbook",
+  "version": "1.0.0",
+  "description": "AI-powered research & prototyping - save tabs to Notion, search workspace, capture screenshots",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.svg",
+      "48": "icons/icon48.svg",
+      "128": "icons/icon128.svg"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["html2canvas.min.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.svg",
+    "48": "icons/icon48.svg",
+    "128": "icons/icon128.svg"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["*.css", "*.js", "*.html", "html2canvas.min.js", "canvas.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

@@ -1,0 +1,186 @@
+document.addEventListener("DOMContentLoaded", async () => {
+  const connectNotionBtn = document.getElementById("connectNotionBtn");
+  const connectNotion = document.getElementById("connectNotion");
+  const saveTabsBtn = document.getElementById("saveTabs");
+  const searchNotionBtn = document.getElementById("searchNotion");
+  const captureToNotionBtn = document.getElementById("captureToNotion");
+  const toggleBtn = document.getElementById("toggleToolbar");
+  const loadBtn = document.getElementById("loadMockups");
+  const statusEl = document.getElementById("status");
+  const apiUrlInput = document.getElementById("apiUrl");
+  const aiModelSelect = document.getElementById("aiModel");
+
+  const { apiUrl, aiModel } = await chrome.storage.local.get(["apiUrl", "aiModel"]);
+  apiUrlInput.value = apiUrl || "http://localhost:3001";
+  aiModelSelect.value = aiModel || "claude";
+
+  apiUrlInput.addEventListener("change", async () => {
+    await chrome.storage.local.set({ apiUrl: apiUrlInput.value });
+    setStatus("API URL saved", true);
+  });
+
+  aiModelSelect.addEventListener("change", async () => {
+    await chrome.storage.local.set({ aiModel: aiModelSelect.value });
+    setStatus("Model saved", true);
+  });
+
+  async function getApiUrl() {
+    const { apiUrl } = await chrome.storage.local.get("apiUrl");
+    return apiUrl || "http://localhost:3001";
+  }
+
+  function setStatus(msg, isSuccess = false) {
+    statusEl.textContent = msg;
+    statusEl.classList.remove("active", "error");
+    if (isSuccess) statusEl.classList.add("active");
+    else if (msg.startsWith("❌")) statusEl.classList.add("error");
+    setTimeout(() => {
+      statusEl.textContent = "Ready";
+      statusEl.classList.remove("active", "error");
+    }, 3000);
+  }
+
+  async function checkNotionStatus() {
+    try {
+      const base = await getApiUrl();
+      const res = await fetch(`${base}/api/notion-status`);
+      const data = await res.json();
+      connectNotionBtn.style.display = data.connected ? "none" : "flex";
+      connectNotion.style.display = data.connected ? "flex" : "none";
+    } catch {
+      connectNotionBtn.style.display = "flex";
+      connectNotion.style.display = "none";
+    }
+  }
+
+  connectNotionBtn.addEventListener("click", async () => {
+    const base = await getApiUrl();
+    chrome.tabs.create({ url: `${base}/auth/notion` });
+    window.close();
+  });
+
+  saveTabsBtn.addEventListener("click", async () => {
+    try {
+      const base = await getApiUrl();
+      const tabs = await chrome.tabs.query({ currentWindow: true });
+      const tabData = tabs
+        .filter((t) => t.url && !t.url.startsWith("chrome://") && !t.url.startsWith("edge://"))
+        .map((t) => ({ url: t.url, title: t.title || t.url }));
+
+      if (tabData.length === 0) {
+        setStatus("❌ No tabs to save");
+        return;
+      }
+
+      setStatus("Saving...");
+      const { aiModel } = await chrome.storage.local.get("aiModel");
+      const res = await fetch(`${base}/api/tabs-to-notion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tabs: tabData, model: aiModel || "claude" }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setStatus(`✓ Saved ${data.created || tabData.length} tabs`, true);
+    } catch (e) {
+      setStatus(`❌ ${e.message}`);
+    }
+  });
+
+  searchNotionBtn.addEventListener("click", async () => {
+    const query = prompt("Search Notion (and Slack, Jira, Drive):");
+    if (!query) return;
+    try {
+      const base = await getApiUrl();
+      setStatus("Searching...");
+      const res = await fetch(`${base}/api/notion-search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      alert(data.results || data.text || "No results");
+      setStatus("Search complete", true);
+    } catch (e) {
+      setStatus(`❌ ${e.message}`);
+    }
+  });
+
+  document.getElementById("researchSummary").addEventListener("click", async () => {
+    try {
+      const base = await getApiUrl();
+      const tabs = await chrome.tabs.query({ currentWindow: true });
+      const tabData = tabs
+        .filter((t) => t.url && !t.url.startsWith("chrome://") && !t.url.startsWith("edge://"))
+        .map((t) => ({ url: t.url, title: t.title || t.url }));
+      if (tabData.length === 0) {
+        setStatus("❌ No tabs to summarize");
+        return;
+      }
+      setStatus("Creating summary...");
+      const { aiModel } = await chrome.storage.local.get("aiModel");
+      const res = await fetch(`${base}/api/research-summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tabs: tabData, model: aiModel || "claude" }),
+      });
+      const data = await res.json();
+      if (res.ok) setStatus("✓ Summary saved to Notion", true);
+      else setStatus(`❌ ${data.error || "Failed"}`);
+    } catch (e) {
+      setStatus(`❌ ${e.message}`);
+    }
+  });
+
+  captureToNotionBtn.addEventListener("click", async () => {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) {
+        setStatus("❌ No active tab");
+        return;
+      }
+      setStatus("Capturing...");
+      const response = await chrome.tabs.sendMessage(tab.id, { type: "NB_CAPTURE_TO_NOTION" });
+      if (response?.success) {
+        setStatus("✓ Saved to Notion", true);
+      } else {
+        setStatus(`❌ ${response?.error || "Failed"}`);
+      }
+    } catch (e) {
+      setStatus("❌ Refresh page & retry");
+    }
+  });
+
+  toggleBtn.addEventListener("click", async () => {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) {
+        setStatus("❌ No active tab");
+        return;
+      }
+      const url = await getApiUrl();
+      await chrome.tabs.sendMessage(tab.id, { type: "PM_TOGGLE_TOOLBAR", apiUrl: url });
+      window.close();
+    } catch (e) {
+      setStatus("❌ Refresh page & retry");
+    }
+  });
+
+  loadBtn.addEventListener("click", async () => {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) {
+        setStatus("❌ No active tab");
+        return;
+      }
+      await chrome.tabs.sendMessage(tab.id, { type: "PM_LOAD_MOCKUPS" });
+      setStatus("✓ Mockups loaded", true);
+    } catch (e) {
+      setStatus("❌ Refresh page & retry");
+    }
+  });
+
+  checkNotionStatus();
+});

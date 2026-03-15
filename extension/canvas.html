@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prototype Canvas - Prototyper</title>
+  <link rel="stylesheet" href="content.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      background: #f5f5f5; 
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    }
+    .canvas-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .canvas {
+      width: 100%;
+      height: 100vh;
+      background: #ffffff;
+      position: relative;
+    }
+    .canvas.framed {
+      width: 1440px;
+      height: 900px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .toolbar-hint {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #18181b;
+      color: #fafafa;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+    .toolbar-hint button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .toolbar-hint button:hover {
+      background: #2563eb;
+    }
+    .size-selector {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #18181b;
+      padding: 8px;
+      border-radius: 8px;
+      display: flex;
+      gap: 4px;
+      z-index: 10000;
+    }
+    .size-btn {
+      background: transparent;
+      color: #a1a1aa;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .size-btn:hover {
+      background: #27272a;
+      color: #fafafa;
+    }
+    .size-btn.active {
+      background: #3b82f6;
+      color: white;
+    }
+    .bg-picker {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #18181b;
+      padding: 12px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 10000;
+    }
+    .bg-picker label {
+      color: #a1a1aa;
+      font-size: 12px;
+    }
+    .bg-picker input[type="color"] {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas-container">
+    <div class="canvas" id="canvas"></div>
+  </div>
+  
+  <div class="toolbar-hint" id="hint">
+    <span>💡 Click the Prototyper extension icon to open the toolbar</span>
+    <button id="dismissHint">Got it</button>
+  </div>
+  
+  <div class="size-selector">
+    <button class="size-btn active" data-size="fullscreen">Fullscreen</button>
+    <button class="size-btn" data-size="desktop">Desktop</button>
+    <button class="size-btn" data-size="laptop">Laptop</button>
+    <button class="size-btn" data-size="tablet">Tablet</button>
+    <button class="size-btn" data-size="mobile">Mobile</button>
+  </div>
+  
+  <div class="bg-picker">
+    <label>Background:</label>
+    <input type="color" id="bgColor" value="#ffffff">
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const hint = document.getElementById('hint');
+    const sizes = {
+      fullscreen: { width: '100%', height: '100vh', framed: false },
+      desktop: { width: '1440px', height: '900px', framed: true },
+      laptop: { width: '1280px', height: '800px', framed: true },
+      tablet: { width: '768px', height: '1024px', framed: true },
+      mobile: { width: '375px', height: '812px', framed: true },
+    };
+
+    // Read query parameters and apply initial settings
+    const urlParams = new URLSearchParams(window.location.search);
+    const initBg = urlParams.get('bg') || '#ffffff';
+    const initSize = urlParams.get('size') || 'fullscreen';
+    
+    // Apply initial background
+    canvas.style.background = initBg;
+    document.getElementById('bgColor').value = initBg;
+    
+    // Apply initial size
+    if (sizes[initSize]) {
+      const s = sizes[initSize];
+      canvas.style.width = s.width;
+      canvas.style.height = s.height;
+      canvas.classList.toggle('framed', s.framed);
+      
+      // Highlight active size button
+      document.querySelectorAll('.size-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.size === initSize);
+      });
+    }
+
+    // Size buttons
+    document.querySelectorAll('.size-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        const size = sizes[btn.dataset.size];
+        canvas.style.width = size.width;
+        canvas.style.height = size.height;
+        canvas.classList.toggle('framed', size.framed);
+      });
+    });
+
+    // Background color
+    document.getElementById('bgColor').addEventListener('input', (e) => {
+      canvas.style.background = e.target.value;
+    });
+
+    // Dismiss hint
+    document.getElementById('dismissHint').addEventListener('click', () => {
+      hint.style.display = 'none';
+    });
+
+    // Auto-hide hint after 3 seconds since toolbar will auto-open
+    setTimeout(() => {
+      hint.style.opacity = '0';
+      hint.style.transition = 'opacity 0.3s';
+      setTimeout(() => hint.style.display = 'none', 300);
+    }, 3000);
+  </script>
+  
+  <!-- Load the prototyper tools -->
+  <script src="html2canvas.min.js"></script>
+  <script src="content.js"></script>
+  <script>
+    // Auto-show the toolbar on canvas page
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        const toolbar = document.getElementById('pm-prototyper-toolbar');
+        if (toolbar) {
+          toolbar.classList.add('visible');
+          // Hide the hint since toolbar is now visible
+          const hint = document.getElementById('hint');
+          if (hint) hint.style.display = 'none';
+        }
+      }, 100);
+    });
+  </script>
+</body>
+</html>
+
