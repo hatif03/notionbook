@@ -18,12 +18,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   const toggleBtn = document.getElementById("toggleToolbar");
   const loadBtn = document.getElementById("loadMockups");
   const statusEl = document.getElementById("status");
+  const statusSettingsEl = document.getElementById("statusSettings");
   const apiUrlInput = document.getElementById("apiUrl");
   const aiModelSelect = document.getElementById("aiModel");
   const apiKeyClaude = document.getElementById("apiKeyClaude");
   const apiKeyGemini = document.getElementById("apiKeyGemini");
   const apiKeyGroq = document.getElementById("apiKeyGroq");
   const saveApiKeysBtn = document.getElementById("saveApiKeys");
+  const settingsBtn = document.getElementById("settingsBtn");
+  const backBtn = document.getElementById("backBtn");
+  const mainView = document.getElementById("mainView");
+  const settingsView = document.getElementById("settingsView");
 
   const { apiUrl, aiModel, apiKeys } = await chrome.storage.local.get(["apiUrl", "aiModel", "apiKeys"]);
   apiUrlInput.value = apiUrl || "http://localhost:3001";
@@ -34,14 +39,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     apiKeyGroq.value = apiKeys.groq || "";
   }
 
+  settingsBtn.addEventListener("click", () => {
+    mainView.classList.remove("active");
+    settingsView.classList.add("active");
+  });
+
+  backBtn.addEventListener("click", () => {
+    settingsView.classList.remove("active");
+    mainView.classList.add("active");
+  });
+
+  function setStatusIn(el, msg, isSuccess = false) {
+    el.textContent = msg;
+    el.classList.remove("active", "error");
+    if (isSuccess) el.classList.add("active");
+    else if (msg.startsWith("❌")) el.classList.add("error");
+    setTimeout(() => {
+      el.textContent = "Ready";
+      el.classList.remove("active", "error");
+    }, 3000);
+  }
+
   apiUrlInput.addEventListener("change", async () => {
     await chrome.storage.local.set({ apiUrl: apiUrlInput.value });
-    setStatus("API URL saved", true);
+    setStatusIn(statusSettingsEl, "API URL saved", true);
   });
 
   aiModelSelect.addEventListener("change", async () => {
     await chrome.storage.local.set({ aiModel: aiModelSelect.value });
-    setStatus("Model saved", true);
+    setStatusIn(statusSettingsEl, "Model saved", true);
   });
 
   saveApiKeysBtn.addEventListener("click", async () => {
@@ -51,7 +77,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       groq: (apiKeyGroq.value || "").trim(),
     };
     await chrome.storage.local.set({ apiKeys: keys });
-    setStatus("API keys saved", true);
+    setStatusIn(statusSettingsEl, "API keys saved", true);
   });
 
   async function getApiUrl() {
@@ -60,14 +86,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function setStatus(msg, isSuccess = false) {
-    statusEl.textContent = msg;
-    statusEl.classList.remove("active", "error");
-    if (isSuccess) statusEl.classList.add("active");
-    else if (msg.startsWith("❌")) statusEl.classList.add("error");
-    setTimeout(() => {
-      statusEl.textContent = "Ready";
-      statusEl.classList.remove("active", "error");
-    }, 3000);
+    setStatusIn(statusEl, msg, isSuccess);
   }
 
   async function checkNotionStatus() {
@@ -173,6 +192,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         setStatus("❌ No active tab");
         return;
       }
+      const url = tab.url || "";
+      if (url.startsWith("chrome://") || url.startsWith("edge://") || url.startsWith("about:") || url.startsWith("chrome-extension://")) {
+        setStatus("❌ Open a regular webpage first");
+        return;
+      }
       setStatus("Capturing...");
       const response = await chrome.tabs.sendMessage(tab.id, { type: "NB_CAPTURE_TO_NOTION" });
       if (response?.success) {
@@ -181,7 +205,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         setStatus(`❌ ${response?.error || "Failed"}`);
       }
     } catch (e) {
-      setStatus("❌ Refresh page & retry");
+      setStatus("❌ Refresh the page & try again");
     }
   });
 
@@ -192,11 +216,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         setStatus("❌ No active tab");
         return;
       }
-      const url = await getApiUrl();
-      await chrome.tabs.sendMessage(tab.id, { type: "PM_TOGGLE_TOOLBAR", apiUrl: url });
+      const url = tab.url || "";
+      if (url.startsWith("chrome://") || url.startsWith("edge://") || url.startsWith("about:") || url.startsWith("chrome-extension://")) {
+        setStatus("❌ Open a regular webpage first (browser pages don't support the toolbar)");
+        return;
+      }
+      const apiUrl = await getApiUrl();
+      await chrome.tabs.sendMessage(tab.id, { type: "PM_TOGGLE_TOOLBAR", apiUrl });
       window.close();
     } catch (e) {
-      setStatus("❌ Refresh page & retry");
+      setStatus("❌ Refresh the page & try again");
     }
   });
 
@@ -207,10 +236,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         setStatus("❌ No active tab");
         return;
       }
+      const url = tab.url || "";
+      if (url.startsWith("chrome://") || url.startsWith("edge://") || url.startsWith("about:") || url.startsWith("chrome-extension://")) {
+        setStatus("❌ Open a regular webpage first");
+        return;
+      }
       await chrome.tabs.sendMessage(tab.id, { type: "PM_LOAD_MOCKUPS" });
       setStatus("✓ Mockups loaded", true);
     } catch (e) {
-      setStatus("❌ Refresh page & retry");
+      setStatus("❌ Refresh the page & try again");
     }
   });
 

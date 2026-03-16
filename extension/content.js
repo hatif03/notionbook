@@ -17,6 +17,8 @@
   let selectedComponent = null;
   let components = [];
   let componentIdCounter = 0;
+  let undoHistory = [];
+  let isRestoring = false;
   let apiUrl = "http://localhost:3001";
   let isDraggingToolbar = false;
   let toolbarOffset = { x: 0, y: 0 };
@@ -94,6 +96,7 @@
     toolbar.id = "pm-prototyper-toolbar";
     toolbar.innerHTML = `
       <div class="pm-toolbar-header">
+        <button class="pm-toolbar-back" id="pm-back" title="Back to page">←</button>
         <span class="pm-toolbar-title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -282,7 +285,7 @@
     // Draggable header
     const header = toolbar.querySelector(".pm-toolbar-header");
     header.addEventListener("mousedown", (e) => {
-      if (e.target.closest(".pm-toolbar-btn")) return;
+      if (e.target.closest(".pm-toolbar-btn") || e.target.closest(".pm-toolbar-back")) return;
       isDraggingToolbar = true;
       toolbarOffset.x = e.clientX - toolbar.offsetLeft;
       toolbarOffset.y = e.clientY - toolbar.offsetTop;
@@ -318,10 +321,12 @@
     });
 
     // Toolbar buttons
-    document.getElementById("pm-minimize").addEventListener("click", () => {
+    const hideToolbar = () => {
       toolbar.classList.remove("visible");
       isToolbarVisible = false;
-    });
+    };
+    document.getElementById("pm-minimize").addEventListener("click", hideToolbar);
+    document.getElementById("pm-back").addEventListener("click", hideToolbar);
 
     document.getElementById("pm-toggle-visibility").addEventListener("click", () => {
       const visibility = components.length > 0 && components[0].element.style.display !== "none";
@@ -338,6 +343,7 @@
     document.getElementById("pm-clear-all").addEventListener("click", clearAllComponents);
     document.getElementById("pm-delete-component").addEventListener("click", deleteSelectedComponent);
     document.getElementById("pm-quick-duplicate").addEventListener("click", duplicateSelected);
+    document.getElementById("pm-quick-undo").addEventListener("click", undoLastAction);
 
     // Canvas controls
     document.getElementById("pm-toggle-canvas").addEventListener("click", toggleBlankCanvas);
@@ -482,7 +488,38 @@
       });
   }
 
+  function saveUndoState() {
+    if (isRestoring) return;
+    undoHistory.push(components.map(c => ({
+      type: c.type,
+      x: c.element.offsetLeft,
+      y: c.element.offsetTop,
+      html: c.element.innerHTML.replace(/<div class="pm-resize-handle[^>]*><\/div>/g, ""),
+      name: c.name,
+      icon: c.icon,
+    })));
+    if (undoHistory.length > 50) undoHistory.shift();
+  }
+
+  function undoLastAction() {
+    if (undoHistory.length === 0) {
+      showToast("Nothing to undo");
+      return;
+    }
+    const snapshot = undoHistory.pop();
+    isRestoring = true;
+    components.forEach(c => c.element.remove());
+    components = [];
+    componentIdCounter = 0;
+    selectComponent(null);
+    snapshot.forEach(s => addComponent("custom", s.x, s.y, s.html));
+    isRestoring = false;
+    updateLayerList();
+    showToast("↩️ Undone");
+  }
+
   function addComponent(type, x, y, customHtml = null) {
+    saveUndoState();
     const componentDef = componentLibrary.find(c => c.type === type) || { 
       type: "custom", name: "Custom", icon: "📦", html: customHtml || "<div>Custom</div>" 
     };
@@ -753,6 +790,7 @@
 
   function deleteSelectedComponent() {
     if (!selectedComponent) return;
+    saveUndoState();
     selectedComponent.element.remove();
     components = components.filter(c => c.id !== selectedComponent.id);
     selectComponent(null);
@@ -761,6 +799,8 @@
   }
 
   function clearAllComponents() {
+    if (components.length === 0) return;
+    saveUndoState();
     components.forEach(c => c.element.remove());
     components = [];
     componentIdCounter = 0;
@@ -903,15 +943,20 @@
 
     try {
       const apiKeys = await getApiKeysForRequest();
+      const { aiModel } = await chrome.storage.local.get("aiModel");
       const response = await fetch(`${apiUrl}/api/generate-component`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, context: document.title, apiKeys }),
+        body: JSON.stringify({
+          prompt,
+          context: document.title,
+          apiKeys,
+          model: aiModel || "claude",
+        }),
       });
 
-      if (!response.ok) throw new Error("Generation failed");
-
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Generation failed");
       if (data.html) {
         if (data.css) {
           const styleEl = document.createElement("style");

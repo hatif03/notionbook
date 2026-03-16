@@ -1,11 +1,11 @@
 import express from "express";
 import cors from "cors";
-import Anthropic from "@anthropic-ai/sdk";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth.js";
 import apiRoutes from "./routes/api.js";
 import { getValidAccessToken } from "./mcp/get-access-token.js";
 import { getAvailableModels } from "./ai/provider.js";
+import { complete } from "./ai/provider.js";
 
 // Load environment variables from .env file
 dotenv.config();
@@ -20,22 +20,24 @@ app.use(express.json({ limit: "10mb" }));
 app.use(authRoutes);
 app.use(apiRoutes);
 
+function getApiKeys(req: { body?: { apiKeys?: Record<string, unknown> } }) {
+  const keys = req.body?.apiKeys;
+  if (!keys || typeof keys !== "object") return undefined;
+  return {
+    anthropic: typeof keys.anthropic === "string" ? keys.anthropic : undefined,
+    google: typeof keys.google === "string" ? keys.google : undefined,
+    groq: typeof keys.groq === "string" ? keys.groq : undefined,
+  };
+}
+
 app.post("/api/generate-component", async (req, res) => {
   try {
-    const { prompt, context, apiKeys } = req.body;
+    const { prompt, context, model = "claude" } = req.body;
+    const apiKeys = getApiKeys(req);
 
     if (!prompt) {
       return res.status(400).json({ error: "Prompt is required" });
     }
-
-    const anthropicKey = apiKeys?.anthropic ?? process.env.ANTHROPIC_API_KEY;
-    if (!anthropicKey) {
-      return res.status(400).json({
-        error: "Claude API key required. Add your key in extension settings (BYOK).",
-      });
-    }
-
-    const anthropic = new Anthropic({ apiKey: anthropicKey });
 
     const systemPrompt = `You are a UI component generator for a visual prototyping tool. Generate HTML and inline CSS for UI components that can be overlaid on existing websites.
 
@@ -50,29 +52,22 @@ Rules:
 
 Current page context: ${context || "Unknown website"}`;
 
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
-      max_tokens: 8096,
-      messages: [
-        {
-          role: "user",
-          content: `Generate a UI component based on this description: ${prompt}`,
-        },
-      ],
-      system: systemPrompt,
+    const { text } = await complete({
+      model: model as "claude" | "gemini" | "groq",
+      apiKeys,
+      prompt: `Generate a UI component based on this description: ${prompt}`,
+      systemPrompt,
+      maxTokens: 8096,
     });
 
-    const content = message.content[0];
-    if (content.type === "text") {
-      try {
-        const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          return res.json(parsed);
-        }
-      } catch {
-        return res.json({ html: content.text, css: "" });
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return res.json(parsed);
       }
+    } catch {
+      return res.json({ html: text, css: "" });
     }
 
     res.json({ html: "", css: "" });
