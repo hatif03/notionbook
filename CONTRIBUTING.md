@@ -1,8 +1,8 @@
-# Contributing to Prototyper
+# Contributing to NotionBook
 
-First off, thank you for considering contributing to Prototyper! 🎉
+First off, thank you for considering contributing to NotionBook.
 
-It's people like you that make Prototyper such a great tool. We welcome contributions from everyone, whether you're fixing a typo, adding a feature, or reporting a bug.
+We welcome contributions from everyone, whether you're fixing a typo, adding a feature, or reporting a bug.
 
 ## 📋 Table of Contents
 
@@ -109,8 +109,8 @@ Unsure where to start? Look for issues labeled:
 
 1. **Fork and clone**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/prototyper.git
-   cd prototyper
+   git clone https://github.com/YOUR_USERNAME/notionbook.git
+   cd notionbook
    ```
 
 2. **Install dependencies**
@@ -141,7 +141,7 @@ Unsure where to start? Look for issues labeled:
 1. **Extension changes:**
    - Make changes to extension files
    - Go to `chrome://extensions/`
-   - Click refresh icon on Prototyper
+   - Click refresh icon on NotionBook
    - Test on a website
 
 2. **Server changes:**
@@ -287,5 +287,5 @@ Don't hesitate to ask! Open a discussion or reach out to maintainers.
 
 ---
 
-Thank you for contributing to Prototyper! 🚀
+Thank you for contributing to NotionBook.
 

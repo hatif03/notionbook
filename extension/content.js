@@ -8,6 +8,8 @@
   let components = [];
   let componentIdCounter = 0;
   let apiUrl = "http://localhost:3001";
+  let notionPrdContext = "";
+  let notionDevSummary = "";
   let isDraggingToolbar = false;
   let toolbarOffset = { x: 0, y: 0 };
 
@@ -66,6 +68,10 @@
     // Data Display
     { type: "stat", name: "Stat Card", icon: "📈", category: "data", html: '<div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; width: 180px;"><p style="margin: 0 0 4px 0; font-size: 12px; color: #6b7280; font-weight: 500; font-family: system-ui, sans-serif;">Total Revenue</p><p style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700; color: #111827; font-family: system-ui, sans-serif;">$45,231</p><p style="margin: 0; font-size: 12px; color: #10b981; font-family: system-ui, sans-serif;">↑ 12% from last month</p></div>' },
     { type: "table", name: "Table", icon: "📊", category: "data", html: '<table style="border-collapse: collapse; width: 400px; font-family: system-ui, sans-serif;"><thead><tr><th style="padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 12px; font-weight: 600; color: #6b7280;">Name</th><th style="padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 12px; font-weight: 600; color: #6b7280;">Status</th><th style="padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb; font-size: 12px; font-weight: 600; color: #6b7280;">Amount</th></tr></thead><tbody><tr><td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #111827;">John Doe</td><td style="padding: 12px; border-bottom: 1px solid #e5e7eb;"><span style="background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 9999px; font-size: 12px;">Active</span></td><td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #111827; text-align: right;">$250.00</td></tr><tr><td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #111827;">Jane Smith</td><td style="padding: 12px; border-bottom: 1px solid #e5e7eb;"><span style="background: #fef3c7; color: #a16207; padding: 2px 8px; border-radius: 9999px; font-size: 12px;">Pending</span></td><td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #111827; text-align: right;">$150.00</td></tr></tbody></table>' },
+    { type: "pm-user-story", name: "User story", icon: "🧩", category: "pm", html: '<div style="background: #fafafa; border: 1px solid #e5e7eb; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 16px; width: 320px; font-family: system-ui, sans-serif;"><p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase;">User story</p><p style="margin: 0; font-size: 14px; color: #111827; line-height: 1.5;">As a <strong>power user</strong>, I want <strong>faster search</strong>, so that <strong>I can ship decisions without context switching</strong>.</p></div>' },
+    { type: "pm-acceptance", name: "Acceptance", icon: "✓", category: "pm", html: '<div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; width: 300px; font-family: system-ui, sans-serif;"><p style="margin: 0 0 10px 0; font-size: 13px; font-weight: 600; color: #111827;">Acceptance criteria</p><ul style="margin: 0; padding-left: 18px; color: #374151; font-size: 13px; line-height: 1.6;"><li>Given a logged-in user…</li><li>When they submit the form…</li><li>Then validation errors show inline.</li></ul></div>' },
+    { type: "pm-roadmap-row", name: "Roadmap row", icon: "🗺️", category: "pm", html: '<div style="display: flex; align-items: center; gap: 12px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; width: 380px; font-family: system-ui, sans-serif;"><span style="background: #dbeafe; color: #1d4ed8; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;">Q2</span><div style="flex: 1;"><p style="margin: 0; font-size: 14px; font-weight: 600; color: #111827;">Feature name</p><p style="margin: 2px 0 0 0; font-size: 12px; color: #6b7280;">High impact · In discovery</p></div><span style="font-size: 12px; color: #a16207; font-weight: 500;">At risk</span></div>' },
+    { type: "pm-decision", name: "Decision log", icon: "⚖️", category: "pm", html: '<div style="background: #fefce8; border: 1px solid #fde047; border-radius: 8px; padding: 14px; width: 340px; font-family: system-ui, sans-serif;"><p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 600; color: #854d0e;">Decision</p><p style="margin: 0 0 8px 0; font-size: 14px; color: #422006; font-weight: 600;">We will ship MVP without offline mode.</p><p style="margin: 0; font-size: 12px; color: #713f12; line-height: 1.5;"><strong>Why:</strong> Time-to-market beats parity for now. <strong>Revisit:</strong> Q3.</p></div>' },
   ];
 
   const fontFamilies = [
@@ -79,6 +85,155 @@
     { name: "Mono", value: "'SF Mono', 'Monaco', monospace" },
   ];
 
+  async function serverFetch(path, options = {}) {
+    const s = await chrome.storage.local.get(["apiUrl", "extensionApiKey"]);
+    const base = (s.apiUrl || apiUrl || "http://localhost:3001").replace(/\/$/, "");
+    const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+    if (s.extensionApiKey) headers["X-API-Key"] = s.extensionApiKey;
+    return fetch(`${base}${path}`, { ...options, headers });
+  }
+
+  async function refreshNotionStatus() {
+    const el = document.getElementById("pm-notion-status");
+    if (!el) return;
+    try {
+      const r = await serverFetch("/api/notion/status");
+      const j = await r.json();
+      el.textContent = j.connected ? "● Notion connected" : "○ Not connected";
+    } catch {
+      el.textContent = "? Server unreachable";
+    }
+  }
+
+  async function capturePrototypePngBase64() {
+    const toolbar = document.getElementById("pm-prototyper-toolbar");
+    const prevDisplay = toolbar.style.display;
+    toolbar.style.display = "none";
+    components.forEach(c => c.element.classList.remove("selected"));
+    const originalPositions = [];
+    components.forEach(c => {
+      const rect = c.element.getBoundingClientRect();
+      originalPositions.push({
+        element: c.element,
+        position: c.element.style.position,
+        left: c.element.style.left,
+        top: c.element.style.top,
+      });
+      c.element.style.position = "absolute";
+      c.element.style.left = (rect.left + window.scrollX) + "px";
+      c.element.style.top = (rect.top + window.scrollY) + "px";
+    });
+    await new Promise(r => setTimeout(r, 200));
+    let b64 = "";
+    try {
+      if (typeof html2canvas === "undefined") throw new Error("no html2canvas");
+      const canvas = await html2canvas(document.documentElement, {
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        x: window.scrollX,
+        y: window.scrollY,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight,
+      });
+      b64 = canvas.toDataURL("image/png").replace(/^data:image\/\w+;base64,/, "");
+    } catch {
+      b64 = "";
+    } finally {
+      originalPositions.forEach(p => {
+        p.element.style.position = p.position || "fixed";
+        p.element.style.left = p.left;
+        p.element.style.top = p.top;
+      });
+      toolbar.style.display = prevDisplay;
+      toolbar.classList.add("visible");
+    }
+    return b64;
+  }
+
+  function setupNotionPanel() {
+    document.getElementById("pm-notion-connect").addEventListener("click", () => {
+      chrome.storage.local.get("apiUrl", (s) => {
+        const base = (s.apiUrl || apiUrl || "http://localhost:3001").replace(/\/$/, "");
+        chrome.tabs.create({ url: `${base}/auth/notion` });
+      });
+    });
+    document.getElementById("pm-notion-refresh").addEventListener("click", refreshNotionStatus);
+    document.getElementById("pm-notion-pull-prd").addEventListener("click", async () => {
+      const q = document.getElementById("pm-notion-title").value.trim() || document.title;
+      const status = document.getElementById("pm-notion-push-status");
+      status.textContent = "Loading…";
+      try {
+        const r = await serverFetch("/api/notion/context-for-prompt", {
+          method: "POST",
+          body: JSON.stringify({ query: q }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.message || j.error || "failed");
+        notionPrdContext = j.snippet || "";
+        status.textContent = `PRD context loaded for AI (${notionPrdContext.length} chars)`;
+      } catch (e) {
+        status.textContent = "❌ " + e.message;
+      }
+    });
+    document.getElementById("pm-notion-pull-dev").addEventListener("click", async () => {
+      const q = document.getElementById("pm-notion-title").value.trim() || document.title;
+      const prev = document.getElementById("pm-notion-dev-preview");
+      const status = document.getElementById("pm-notion-push-status");
+      status.textContent = "Searching Notion…";
+      try {
+        const r = await serverFetch("/api/notion/dev-context", {
+          method: "POST",
+          body: JSON.stringify({ query: q }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.message || j.error || "failed");
+        notionDevSummary = j.summaryText || "";
+        const linkLines = (j.links || []).slice(0, 6).join("\n");
+        prev.textContent = linkLines || notionDevSummary.slice(0, 500);
+        status.textContent = "Dev context ready";
+      } catch (e) {
+        status.textContent = "❌ " + e.message;
+      }
+    });
+    document.getElementById("pm-notion-push").addEventListener("click", async () => {
+      const title = document.getElementById("pm-notion-title").value.trim();
+      const status = document.getElementById("pm-notion-push-status");
+      if (!title) {
+        status.textContent = "Enter a feature title";
+        return;
+      }
+      status.textContent = "Capturing & pushing…";
+      try {
+        const shot = await capturePrototypePngBase64();
+        const includeDev = document.getElementById("pm-notion-include-dev-push").checked;
+        const r = await serverFetch("/api/notion/push-prototype", {
+          method: "POST",
+          body: JSON.stringify({
+            title,
+            pageUrl: window.location.href,
+            parentPageId: document.getElementById("pm-notion-parent").value.trim() || undefined,
+            problem: document.getElementById("pm-notion-problem").value.trim() || undefined,
+            successMetric: document.getElementById("pm-notion-metric").value.trim() || undefined,
+            notes: document.getElementById("pm-notion-notes").value.trim() || undefined,
+            screenshotBase64: shot || undefined,
+            devContextSummary: includeDev ? notionDevSummary : undefined,
+            includeDevContextInPage: includeDev,
+          }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.message || j.error || "push failed");
+        status.textContent = "✓ Pushed to Notion";
+      } catch (e) {
+        status.textContent = "❌ " + e.message;
+      }
+    });
+  }
+
   function createToolbar() {
     const toolbar = document.createElement("div");
     toolbar.id = "pm-prototyper-toolbar";
@@ -89,7 +244,7 @@
             <rect x="3" y="3" width="18" height="18" rx="2"/>
             <path d="M3 9h18M9 21V9"/>
           </svg>
-          Prototyper
+          NotionBook
         </span>
         <div class="pm-toolbar-actions">
           <button class="pm-toolbar-btn" id="pm-toggle-visibility" title="Toggle">👁️</button>
@@ -104,6 +259,7 @@
           <button class="pm-toolbar-tab" data-tab="style">Style</button>
           <button class="pm-toolbar-tab" data-tab="layers">Layers</button>
           <button class="pm-toolbar-tab" data-tab="canvas">Canvas</button>
+          <button class="pm-toolbar-tab" data-tab="notion">Notion</button>
         </div>
       <div class="pm-toolbar-content">
         <div class="pm-toolbar-panel active" id="pm-panel-components">
@@ -121,6 +277,7 @@
           <div class="pm-ai-section">
             <textarea class="pm-ai-input" id="pm-ai-prompt" placeholder="Describe the component you want...&#10;&#10;Example: A pricing card with three tiers showing monthly prices"></textarea>
             <button class="pm-btn pm-btn-primary" id="pm-ai-generate">✨ Generate Component</button>
+            <p class="pm-ai-hint">Provider &amp; API key: extension popup (BYOK)</p>
             <div id="pm-ai-status">Ready to generate</div>
           </div>
         </div>
@@ -255,6 +412,35 @@
             <button class="pm-btn pm-btn-secondary" id="pm-open-blank-page">📄 Open Blank Page</button>
           </div>
         </div>
+
+        <div class="pm-toolbar-panel" id="pm-panel-notion">
+          <div class="pm-notion-block">
+            <div class="pm-notion-status" id="pm-notion-status">○ Not connected</div>
+            <div class="pm-notion-row">
+              <button type="button" class="pm-btn pm-btn-secondary pm-notion-btn-sm" id="pm-notion-connect">Connect Notion</button>
+              <button type="button" class="pm-btn pm-btn-secondary pm-notion-btn-sm" id="pm-notion-refresh">Refresh status</button>
+            </div>
+          </div>
+          <label class="pm-notion-label">Feature title</label>
+          <input type="text" class="pm-notion-input" id="pm-notion-title" placeholder="e.g. Checkout redesign">
+          <label class="pm-notion-label">Problem</label>
+          <textarea class="pm-notion-textarea" id="pm-notion-problem" rows="2" placeholder="What problem does this solve?"></textarea>
+          <label class="pm-notion-label">Success metric</label>
+          <input type="text" class="pm-notion-input" id="pm-notion-metric" placeholder="e.g. +15% conversion">
+          <label class="pm-notion-label">Parent page URL or ID (optional)</label>
+          <input type="text" class="pm-notion-input" id="pm-notion-parent" placeholder="Notion page to nest under">
+          <label class="pm-notion-label">Notes</label>
+          <textarea class="pm-notion-textarea" id="pm-notion-notes" rows="2" placeholder="Links, risks, open questions…"></textarea>
+          <div class="pm-notion-row">
+            <button type="button" class="pm-btn pm-btn-secondary pm-notion-btn-sm" id="pm-notion-pull-prd">Pull PRD context for AI</button>
+            <button type="button" class="pm-btn pm-btn-secondary pm-notion-btn-sm" id="pm-notion-pull-dev">Pull dev context</button>
+          </div>
+          <div class="pm-notion-preview" id="pm-notion-dev-preview"></div>
+          <label class="pm-notion-check"><input type="checkbox" id="pm-notion-include-dev-ai"> Include dev context in next AI generation</label>
+          <label class="pm-notion-check"><input type="checkbox" id="pm-notion-include-dev-push"> Include dev context in Notion push</label>
+          <button type="button" class="pm-btn pm-btn-primary" id="pm-notion-push">Push capture to Notion</button>
+          <p class="pm-notion-hint" id="pm-notion-push-status"></p>
+        </div>
       </div>
       <div class="pm-quick-actions">
         <button class="pm-quick-btn" id="pm-quick-undo" title="Undo">↩️ Undo</button>
@@ -296,6 +482,7 @@
         toolbar.querySelectorAll(".pm-toolbar-panel").forEach(p => p.classList.remove("active"));
         tab.classList.add("active");
         document.getElementById(`pm-panel-${tab.dataset.tab}`).classList.add("active");
+        if (tab.dataset.tab === "notion") refreshNotionStatus();
       });
     });
 
@@ -342,6 +529,7 @@
     document.getElementById("pm-canvas-size").addEventListener("change", updateCanvasSize);
 
     setupStyleControls();
+    setupNotionPanel();
   }
 
   function setupStyleControls() {
@@ -890,15 +1078,48 @@
     statusEl.textContent = "⏳ Generating...";
 
     try {
-      const response = await fetch(`${apiUrl}/api/generate-component`, {
+      const s = await chrome.storage.local.get([
+        "apiUrl",
+        "extensionApiKey",
+        "llmProvider",
+        "llmApiKey",
+        "llmModel",
+      ]);
+      const base = (s.apiUrl || apiUrl || "http://localhost:3001").replace(/\/$/, "");
+      const headers = { "Content-Type": "application/json" };
+      if (s.extensionApiKey) headers["X-API-Key"] = s.extensionApiKey;
+
+      const ctxParts = [`Page: ${document.title}`, `URL: ${window.location.href}`];
+      if (notionPrdContext) ctxParts.push(`Notion PRD context:\n${notionPrdContext}`);
+      const devCb = document.getElementById("pm-notion-include-dev-ai");
+      if (devCb && devCb.checked && notionDevSummary) {
+        ctxParts.push(`Engineering / Slack (from Notion search):\n${notionDevSummary}`);
+      }
+      const context = ctxParts.join("\n\n");
+
+      const llmModel = typeof s.llmModel === "string" && s.llmModel.trim() ? s.llmModel.trim() : undefined;
+      const body = {
+        prompt,
+        context,
+        llmProvider: s.llmProvider || "anthropic",
+        llmApiKey: typeof s.llmApiKey === "string" ? s.llmApiKey : undefined,
+        ...(llmModel ? { llmModel } : {}),
+      };
+
+      const response = await fetch(`${base}/api/generate-component`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, context: document.title }),
+        headers,
+        body: JSON.stringify(body),
       });
 
-      if (!response.ok) throw new Error("Generation failed");
-
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        let errMsg = data.message || "Generation failed";
+        if (data.error === "missing_llm_key") {
+          errMsg = data.message || "Add your LLM API key in the extension popup (BYOK).";
+        }
+        throw new Error(errMsg);
+      }
       if (data.html) {
         if (data.css) {
           const styleEl = document.createElement("style");

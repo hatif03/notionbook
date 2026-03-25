@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Prototyper",
-  "version": "1.0.0",
-  "description": "Visual prototyping toolkit - overlay and edit UI components on any website",
+  "name": "NotionBook PM Prototyper",
+  "version": "1.2.0",
+  "description": "PM-focused visual prototyping on any site — AI mockups, Notion MCP capture, PRD context",
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
     "<all_urls>"

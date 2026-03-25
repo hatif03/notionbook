@@ -22,3 +22,6 @@ Thumbs.db
 # Build output
 dist
 build
+
+# Notion OAuth token store (server)
+server/.data

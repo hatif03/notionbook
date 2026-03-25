@@ -1,7 +1,7 @@
 {
-  "name": "prototyper-server",
-  "version": "1.0.0",
-  "description": "Backend API server for Prototyper Chrome extension - AI-powered component generation",
+  "name": "notionbook-server",
+  "version": "1.2.0",
+  "description": "NotionBook backend — Notion MCP, PM prototyping API, multi-provider LLM (BYOK)",
   "type": "module",
   "scripts": {
     "dev": "tsx watch index.ts",
@@ -11,10 +11,12 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
-    "anthropic-ai": "^0.0.10",
+    "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "openai": "^6.32.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

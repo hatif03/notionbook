@@ -128,6 +128,23 @@
       color: #52525b;
     }
 
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #fafafa;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: #3f3f46;
+    }
+
     .status {
       text-align: center;
       font-size: 12px;
@@ -172,8 +189,8 @@
         <path d="M3 9h18M9 21V9"/>
       </svg>
     </div>
-    <h1>Prototyper</h1>
-    <p class="tagline">Visual mockups on any website</p>
+    <h1>NotionBook</h1>
+    <p class="tagline">PM prototyping + Notion MCP</p>
   </div>
 
   <div class="content">
@@ -189,6 +206,29 @@
     <div class="config">
       <label>Backend API URL</label>
       <input type="text" id="apiUrl" placeholder="http://localhost:3001">
+    </div>
+    <div class="config">
+      <label>Extension API key (optional)</label>
+      <input type="password" id="extensionApiKey" placeholder="Matches EXTENSION_API_KEY on server" autocomplete="off">
+    </div>
+
+    <div class="divider"></div>
+    <p class="tagline" style="text-align:left;margin-bottom:10px;">LLM (BYOK) — keys stay in this browser</p>
+    <div class="config">
+      <label>AI provider</label>
+      <select id="llmProvider">
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="groq">Groq (OpenAI-compatible)</option>
+        <option value="gemini">Google Gemini</option>
+      </select>
+    </div>
+    <div class="config">
+      <label>LLM API key</label>
+      <input type="password" id="llmApiKey" placeholder="Your provider API key" autocomplete="off">
+    </div>
+    <div class="config">
+      <label>Model override (optional)</label>
+      <input type="text" id="llmModel" placeholder="e.g. llama-3.3-70b-versatile" autocomplete="off">
     </div>
     
     <div class="status" id="status">Ready to prototype</div>
