@@ -32,27 +32,6 @@
       border-radius: 12px;
       overflow: hidden;
     }
-    .back-btn {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      background: #18181b;
-      color: #fafafa;
-      border: none;
-      padding: 10px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      z-index: 10000;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
-    .back-btn:hover {
-      background: #27272a;
-    }
     .toolbar-hint {
       position: fixed;
       top: 20px;
@@ -138,10 +117,6 @@
   </style>
 </head>
 <body>
-  <button class="back-btn" id="backBtn" title="Close and return">
-    <span>←</span> Back
-  </button>
-
   <div class="canvas-container">
     <div class="canvas" id="canvas"></div>
   </div>
@@ -213,17 +188,6 @@
     // Background color
     document.getElementById('bgColor').addEventListener('input', (e) => {
       canvas.style.background = e.target.value;
-    });
-
-    // Back button - close tab to return to previous page
-    document.getElementById('backBtn').addEventListener('click', () => {
-      if (typeof chrome !== 'undefined' && chrome.tabs) {
-        chrome.tabs.getCurrent((tab) => {
-          if (tab?.id) chrome.tabs.remove(tab.id);
-        });
-      } else {
-        window.close();
-      }
     });
 
     // Dismiss hint

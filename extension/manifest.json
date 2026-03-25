@@ -1,13 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Notionbook",
+  "name": "Prototyper",
   "version": "1.0.0",
-  "description": "AI-powered research & prototyping - save tabs to Notion, search workspace, capture screenshots",
+  "description": "Visual prototyping toolkit - overlay and edit UI components on any website",
   "permissions": [
     "activeTab",
     "storage",
-    "scripting",
-    "tabs"
+    "scripting"
   ],
   "host_permissions": [
     "<all_urls>"

@@ -1,39 +1,31 @@
 import express from "express";
 import cors from "cors";
+import Anthropic from "@anthropic-ai/sdk";
 import dotenv from "dotenv";
-import authRoutes from "./routes/auth.js";
-import apiRoutes from "./routes/api.js";
-import { getValidAccessToken } from "./mcp/get-access-token.js";
-import { getAvailableModels } from "./ai/provider.js";
-import { complete } from "./ai/provider.js";
 
 // Load environment variables from .env file
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = 3001;
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
-// Notion OAuth + API routes
-app.use(authRoutes);
-app.use(apiRoutes);
-
-function getApiKeys(req: { body?: { apiKeys?: Record<string, unknown> } }) {
-  const keys = req.body?.apiKeys;
-  if (!keys || typeof keys !== "object") return undefined;
-  return {
-    anthropic: typeof keys.anthropic === "string" ? keys.anthropic : undefined,
-    google: typeof keys.google === "string" ? keys.google : undefined,
-    groq: typeof keys.groq === "string" ? keys.groq : undefined,
-  };
+// Check for API key
+const apiKey = process.env.ANTHROPIC_API_KEY || process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
+if (!apiKey) {
+  console.error("⚠️  WARNING: No ANTHROPIC_API_KEY found in .env file!");
+  console.error("   Create a .env file with: ANTHROPIC_API_KEY=your-key-here");
 }
+
+const anthropic = new Anthropic({
+  apiKey: apiKey,
+});
 
 app.post("/api/generate-component", async (req, res) => {
   try {
-    const { prompt, context, model = "claude" } = req.body;
-    const apiKeys = getApiKeys(req);
+    const { prompt, context } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ error: "Prompt is required" });
@@ -52,22 +44,29 @@ Rules:
 
 Current page context: ${context || "Unknown website"}`;
 
-    const { text } = await complete({
-      model: model as "claude" | "gemini" | "groq",
-      apiKeys,
-      prompt: `Generate a UI component based on this description: ${prompt}`,
-      systemPrompt,
-      maxTokens: 8096,
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 8096,
+      messages: [
+        {
+          role: "user",
+          content: `Generate a UI component based on this description: ${prompt}`,
+        },
+      ],
+      system: systemPrompt,
     });
 
-    try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return res.json(parsed);
+    const content = message.content[0];
+    if (content.type === "text") {
+      try {
+        const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          return res.json(parsed);
+        }
+      } catch {
+        return res.json({ html: content.text, css: "" });
       }
-    } catch {
-      return res.json({ html: text, css: "" });
     }
 
     res.json({ html: "", css: "" });
@@ -79,19 +78,6 @@ Current page context: ${context || "Unknown website"}`;
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
-});
-
-app.get("/api/notion-status", async (req, res) => {
-  try {
-    const token = await getValidAccessToken();
-    res.json({ connected: !!token });
-  } catch {
-    res.json({ connected: false });
-  }
-});
-
-app.get("/api/ai-models", (req, res) => {
-  res.json({ models: getAvailableModels() });
 });
 
 app.listen(PORT, "0.0.0.0", () => {

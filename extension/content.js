@@ -4,21 +4,9 @@
 
   const STORAGE_KEY = "pm-prototyper-mockups";
   let isToolbarVisible = false;
-
-  async function getApiKeysForRequest() {
-    const { apiKeys } = await chrome.storage.local.get("apiKeys");
-    if (!apiKeys || typeof apiKeys !== "object") return undefined;
-    const out = {};
-    if (typeof apiKeys.anthropic === "string" && apiKeys.anthropic.trim()) out.anthropic = apiKeys.anthropic.trim();
-    if (typeof apiKeys.google === "string" && apiKeys.google.trim()) out.google = apiKeys.google.trim();
-    if (typeof apiKeys.groq === "string" && apiKeys.groq.trim()) out.groq = apiKeys.groq.trim();
-    return Object.keys(out).length ? out : undefined;
-  }
   let selectedComponent = null;
   let components = [];
   let componentIdCounter = 0;
-  let undoHistory = [];
-  let isRestoring = false;
   let apiUrl = "http://localhost:3001";
   let isDraggingToolbar = false;
   let toolbarOffset = { x: 0, y: 0 };
@@ -96,7 +84,6 @@
     toolbar.id = "pm-prototyper-toolbar";
     toolbar.innerHTML = `
       <div class="pm-toolbar-header">
-        <button class="pm-toolbar-back" id="pm-back" title="Back to page">←</button>
         <span class="pm-toolbar-title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -107,7 +94,6 @@
         <div class="pm-toolbar-actions">
           <button class="pm-toolbar-btn" id="pm-toggle-visibility" title="Toggle">👁️</button>
           <button class="pm-toolbar-btn" id="pm-export" title="Export PNG">📷</button>
-          <button class="pm-toolbar-btn" id="pm-export-notion" title="Save to Notion">📤</button>
           <button class="pm-toolbar-btn" id="pm-save" title="Save">💾</button>
           <button class="pm-toolbar-btn" id="pm-minimize" title="Close">✕</button>
         </div>
@@ -285,7 +271,7 @@
     // Draggable header
     const header = toolbar.querySelector(".pm-toolbar-header");
     header.addEventListener("mousedown", (e) => {
-      if (e.target.closest(".pm-toolbar-btn") || e.target.closest(".pm-toolbar-back")) return;
+      if (e.target.closest(".pm-toolbar-btn")) return;
       isDraggingToolbar = true;
       toolbarOffset.x = e.clientX - toolbar.offsetLeft;
       toolbarOffset.y = e.clientY - toolbar.offsetTop;
@@ -321,12 +307,10 @@
     });
 
     // Toolbar buttons
-    const hideToolbar = () => {
+    document.getElementById("pm-minimize").addEventListener("click", () => {
       toolbar.classList.remove("visible");
       isToolbarVisible = false;
-    };
-    document.getElementById("pm-minimize").addEventListener("click", hideToolbar);
-    document.getElementById("pm-back").addEventListener("click", hideToolbar);
+    });
 
     document.getElementById("pm-toggle-visibility").addEventListener("click", () => {
       const visibility = components.length > 0 && components[0].element.style.display !== "none";
@@ -336,14 +320,12 @@
     });
 
     document.getElementById("pm-export").addEventListener("click", exportAsPNG);
-    document.getElementById("pm-export-notion").addEventListener("click", exportToNotion);
     document.getElementById("pm-quick-export").addEventListener("click", exportAsPNG);
     document.getElementById("pm-save").addEventListener("click", saveMockups);
     document.getElementById("pm-ai-generate").addEventListener("click", generateWithAI);
     document.getElementById("pm-clear-all").addEventListener("click", clearAllComponents);
     document.getElementById("pm-delete-component").addEventListener("click", deleteSelectedComponent);
     document.getElementById("pm-quick-duplicate").addEventListener("click", duplicateSelected);
-    document.getElementById("pm-quick-undo").addEventListener("click", undoLastAction);
 
     // Canvas controls
     document.getElementById("pm-toggle-canvas").addEventListener("click", toggleBlankCanvas);
@@ -488,38 +470,7 @@
       });
   }
 
-  function saveUndoState() {
-    if (isRestoring) return;
-    undoHistory.push(components.map(c => ({
-      type: c.type,
-      x: c.element.offsetLeft,
-      y: c.element.offsetTop,
-      html: c.element.innerHTML.replace(/<div class="pm-resize-handle[^>]*><\/div>/g, ""),
-      name: c.name,
-      icon: c.icon,
-    })));
-    if (undoHistory.length > 50) undoHistory.shift();
-  }
-
-  function undoLastAction() {
-    if (undoHistory.length === 0) {
-      showToast("Nothing to undo");
-      return;
-    }
-    const snapshot = undoHistory.pop();
-    isRestoring = true;
-    components.forEach(c => c.element.remove());
-    components = [];
-    componentIdCounter = 0;
-    selectComponent(null);
-    snapshot.forEach(s => addComponent("custom", s.x, s.y, s.html));
-    isRestoring = false;
-    updateLayerList();
-    showToast("↩️ Undone");
-  }
-
   function addComponent(type, x, y, customHtml = null) {
-    saveUndoState();
     const componentDef = componentLibrary.find(c => c.type === type) || { 
       type: "custom", name: "Custom", icon: "📦", html: customHtml || "<div>Custom</div>" 
     };
@@ -790,7 +741,6 @@
 
   function deleteSelectedComponent() {
     if (!selectedComponent) return;
-    saveUndoState();
     selectedComponent.element.remove();
     components = components.filter(c => c.id !== selectedComponent.id);
     selectComponent(null);
@@ -799,8 +749,6 @@
   }
 
   function clearAllComponents() {
-    if (components.length === 0) return;
-    saveUndoState();
     components.forEach(c => c.element.remove());
     components = [];
     componentIdCounter = 0;
@@ -942,21 +890,15 @@
     statusEl.textContent = "⏳ Generating...";
 
     try {
-      const apiKeys = await getApiKeysForRequest();
-      const { aiModel } = await chrome.storage.local.get("aiModel");
       const response = await fetch(`${apiUrl}/api/generate-component`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          context: document.title,
-          apiKeys,
-          model: aiModel || "claude",
-        }),
+        body: JSON.stringify({ prompt, context: document.title }),
       });
 
+      if (!response.ok) throw new Error("Generation failed");
+
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Generation failed");
       if (data.html) {
         if (data.css) {
           const styleEl = document.createElement("style");
@@ -1094,56 +1036,6 @@
     }
   }
 
-  async function exportToNotion() {
-    const toolbar = document.getElementById("pm-prototyper-toolbar");
-    toolbar.style.display = "none";
-    components.forEach(c => c.element.classList.remove("selected"));
-    const originalPositions = [];
-    components.forEach(c => {
-      const rect = c.element.getBoundingClientRect();
-      originalPositions.push({ element: c.element, position: c.element.style.position, left: c.element.style.left, top: c.element.style.top });
-      c.element.style.position = "absolute";
-      c.element.style.left = (rect.left + window.scrollX) + "px";
-      c.element.style.top = (rect.top + window.scrollY) + "px";
-    });
-    await new Promise(r => setTimeout(r, 200));
-    try {
-      if (typeof html2canvas === "undefined") throw new Error("html2canvas not loaded");
-      const canvas = await html2canvas(document.documentElement, {
-        useCORS: true, allowTaint: true, logging: false,
-        x: window.scrollX, y: window.scrollY, width: window.innerWidth, height: window.innerHeight,
-      });
-      const imageBase64 = canvas.toDataURL("image/png").split(",")[1];
-      const { apiUrl: base } = await chrome.storage.local.get("apiUrl");
-      const { aiModel } = await chrome.storage.local.get("aiModel");
-      const apiKeys = await getApiKeysForRequest();
-      const res = await fetch((base || apiUrl || "http://localhost:3001") + "/api/screenshot-to-notion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageBase64,
-          url: window.location.href,
-          title: "Prototype: " + document.title,
-          model: aiModel || "claude",
-          apiKeys,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) showToast("✓ Saved to Notion!");
-      else showToast("❌ " + (data.error || "Failed"));
-    } catch (e) {
-      showToast("❌ " + e.message);
-    } finally {
-      originalPositions.forEach(p => {
-        p.element.style.position = p.position || "fixed";
-        p.element.style.left = p.left;
-        p.element.style.top = p.top;
-      });
-      toolbar.style.display = "";
-      toolbar.classList.add("visible");
-    }
-  }
-
   function showToast(message) {
     const existing = document.querySelector(".pm-toast");
     if (existing) existing.remove();
@@ -1191,44 +1083,6 @@
       } else if (message.type === "PM_LOAD_MOCKUPS") {
         loadMockups();
         sendResponse({ success: true });
-      } else if (message.type === "NB_CAPTURE_TO_NOTION") {
-        (async () => {
-          try {
-            const { apiUrl: storedUrl } = await chrome.storage.local.get("apiUrl");
-            const baseUrl = storedUrl || "http://localhost:3001";
-            const { aiModel } = await chrome.storage.local.get("aiModel");
-            const toolbar = document.getElementById("pm-prototyper-toolbar");
-            if (toolbar) toolbar.style.display = "none";
-            if (typeof html2canvas === "undefined") {
-              sendResponse({ success: false, error: "html2canvas not loaded" });
-              return;
-            }
-            const canvas = await html2canvas(document.documentElement, {
-              useCORS: true, allowTaint: true, logging: false,
-              x: window.scrollX, y: window.scrollY,
-              width: window.innerWidth, height: window.innerHeight,
-            });
-            const imageBase64 = canvas.toDataURL("image/png").split(",")[1];
-            const apiKeys = await getApiKeysForRequest();
-            const res = await fetch(`${baseUrl}/api/screenshot-to-notion`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                imageBase64,
-                url: window.location.href,
-                title: document.title,
-                model: aiModel || "claude",
-                apiKeys,
-              }),
-            });
-            const data = await res.json();
-            if (toolbar) toolbar.style.display = "";
-            sendResponse(res.ok ? { success: true } : { success: false, error: data.error });
-          } catch (e) {
-            sendResponse({ success: false, error: e.message });
-          }
-        })();
-        return true;
       }
       return true;
     });
@@ -1247,51 +1101,6 @@
       } else if (e.data.type === "PM_PROTOTYPER_SET_API_URL") {
         apiUrl = e.data.url || "http://localhost:3001";
       }
-    });
-
-    // Quick capture: show "Save to Notion" when text is selected
-    let quickCaptureEl = null;
-    document.addEventListener("mouseup", () => {
-      try {
-      const sel = window.getSelection();
-      const text = sel?.toString()?.trim();
-      if (quickCaptureEl) {
-        quickCaptureEl.remove();
-        quickCaptureEl = null;
-      }
-      if (!text || text.length < 3) return;
-      if (!sel.rangeCount) return;
-      quickCaptureEl = document.createElement("button");
-      quickCaptureEl.textContent = "Save to Notion";
-      quickCaptureEl.style.cssText = "position:fixed;z-index:2147483646;padding:8px 14px;background:#3b82f6;color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);";
-      const rect = sel.getRangeAt(0).getBoundingClientRect();
-      quickCaptureEl.style.left = rect.left + "px";
-      quickCaptureEl.style.top = (rect.bottom + 4) + "px";
-      quickCaptureEl.onclick = async () => {
-        try {
-          const { apiUrl: base } = await chrome.storage.local.get("apiUrl");
-          const { aiModel } = await chrome.storage.local.get("aiModel");
-          const apiKeys = await getApiKeysForRequest();
-          await fetch((base || "http://localhost:3001") + "/api/quick-capture", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ quote: text, url: location.href, title: document.title, model: aiModel || "claude", apiKeys }),
-          });
-          quickCaptureEl.remove();
-          quickCaptureEl = null;
-          sel.removeAllRanges();
-        } catch (e) {
-          console.error("Quick capture error:", e);
-        }
-      };
-      document.body.appendChild(quickCaptureEl);
-      setTimeout(() => {
-        if (quickCaptureEl && document.body.contains(quickCaptureEl)) {
-          quickCaptureEl.remove();
-          quickCaptureEl = null;
-        }
-      }, 5000);
-      } catch (e) { /* ignore */ }
     });
   }
 

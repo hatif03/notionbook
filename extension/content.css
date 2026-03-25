@@ -71,23 +71,6 @@
   user-select: none;
 }
 
-.pm-toolbar-back {
-  background: transparent;
-  border: none;
-  color: var(--pm-text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  padding: 6px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-.pm-toolbar-back:hover {
-  background: var(--pm-bg-tertiary);
-  color: var(--pm-text);
-}
-
 .pm-toolbar-title {
   font-size: 14px;
   font-weight: 600;
